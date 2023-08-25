@@ -1,0 +1,1 @@
+@ECHO OFF & title server & network_main.exe -s --width 50 --height 10

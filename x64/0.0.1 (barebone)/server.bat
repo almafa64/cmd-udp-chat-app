@@ -1,0 +1,1 @@
+@ECHO OFF & title server & network_main.exe -sv

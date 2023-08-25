@@ -1,1 +1,0 @@
-@ECHO OFF & title server & test.exe -s

@@ -110,7 +110,7 @@ void runClient()
 	// MOUSE
 	int scrolled = 0;
 
-	/*if (!SetConsoleCtrlHandler(ctrl_handler, TRUE))
+	if (!SetConsoleCtrlHandler(ctrl_handler, TRUE))
 	{
 		printf("couldn't set ctrl handler %li\n", GetLastError());
 		return;
@@ -121,7 +121,7 @@ void runClient()
 	{
 		printf("error while making mouse thread: %li\n", GetLastError());
 		return;
-	}*/
+	}
 
 	for (;;)
 	{
