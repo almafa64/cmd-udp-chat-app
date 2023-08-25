@@ -18,6 +18,20 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="headers\args.h" />
+    <ClInclude Include="headers\client.h" />
+    <ClInclude Include="headers\main.h" />
+    <ClInclude Include="headers\server.h" />
+    <ClInclude Include="headers\utils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="sources\args.c" />
+    <ClCompile Include="sources\client.c" />
+    <ClCompile Include="sources\main.c" />
+    <ClCompile Include="sources\server.c" />
+    <ClCompile Include="sources\utils.c" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -74,6 +88,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <CustomBuildAfterTargets>
     </CustomBuildAfterTargets>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>D:\Programok\visual_saves\visual studio\test_networking\headers;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -199,20 +216,6 @@ FOR /F %%x IN ('tasklist /NH /FI "IMAGENAME eq %EXE%"') DO IF %%x == %EXE_% (
 :end</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="args.c" />
-    <ClCompile Include="client.c" />
-    <ClCompile Include="main.c" />
-    <ClCompile Include="server.c" />
-    <ClCompile Include="utils.c" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="args.h" />
-    <ClInclude Include="client.h" />
-    <ClInclude Include="main.h" />
-    <ClInclude Include="server.h" />
-    <ClInclude Include="utils.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
