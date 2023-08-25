@@ -13,5 +13,5 @@ after finishing the login you can use commands (use /help to get help)
 
 
 
-#### PS
+### PS
 If you looked into client.c, then yes, the mouse has a full thread for itself. This is because this is a cmd application and GetMessage only works with window applications, so it waits forever for a message (but there will be no message) -> fully freezes thread.
