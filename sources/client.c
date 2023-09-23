@@ -34,7 +34,7 @@ BOOL CALLBACK ctrl_handler(DWORD dwCtrlType)
 
 void history_save_down(int* scrolled, CHAR_INFO* lines, size_t lines_size, size_t line_size)
 {
-	if (scrolled == MAX_LINE_HISTORY)
+	if (*scrolled == MAX_LINE_HISTORY)
 	{
 		size_t lastLine = lines_size - line_size;
 		errno_t error = memcpy_s(lines, lines_size * sizeof(*lines), &lines[line_size], lastLine * sizeof(*lines));
@@ -50,7 +50,7 @@ void history_save_down(int* scrolled, CHAR_INFO* lines, size_t lines_size, size_
 			tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
 		}
 
-		--scrolled;
+		--*scrolled;
 	}
 }
 
@@ -159,7 +159,7 @@ void runClient()
 		case -1: //down
 			mouseWheel = 0;
 			if (MAX_LINE_HISTORY == 0 || ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
-			history_save_down(&scrolled, &lines, lines_size, line_size);
+			history_save_down(&scrolled, lines, lines_size, line_size);
 			ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 			printf(CSI "S");
 			WriteLine(cmd, &lines[line_size * (marginHeight + ++scrolled)], cmdCols, marginAbsBottom);
@@ -285,7 +285,7 @@ void runClient()
 				for (;;) // scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
 				{
 					if (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
-					history_save_down(&scrolled, &lines, lines_size, line_size);
+					history_save_down(&scrolled, lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 					printf(CSI "S");
 					WriteLine(cmd, &lines[line_size * (marginHeight + ++scrolled)], cmdCols, marginAbsBottom);
@@ -293,7 +293,7 @@ void runClient()
 
 				for (int i = 0; i < n; ++i)
 				{
-					history_save_down(&scrolled, &lines, lines_size, line_size);
+					history_save_down(&scrolled, lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled++)], cmdCols, marginAbsTop + i);
 				}
 			}
