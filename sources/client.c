@@ -1,5 +1,6 @@
 #include "client.h"
 #include "utils.h"
+#include "shlwapi.h"
 
 LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
@@ -72,19 +73,21 @@ void runClient()
 	fgetws(name, 31, stdin);
 	int nameLen = wcslen(name);
 	if (name[nameLen - 1] == L'\n') --nameLen;
+	name[nameLen] = L'\0';
+	StrTrimW(name, L" ");
+	nameLen = wcslen(name);
 	if (nameLen == 0)
 	{
 		wcscpy_s(name, nameWordSize, L"anom");
 		nameLen = 4;
 	}
-	name[nameLen] = L'\0';
 
 	int iResult = my_wsend(&sock, L"", &servaddr);
 	if (iResult == SOCKET_ERROR) return;
 
 	printf(CSI "?1049h"); // enable alt cmd
 
-	// print out ip and name on top
+	// print name on top
 	printf(CSI "?25l" CSI "3;%dr" "name: ", cmdRows - 5); // hide cursor -> Set scrolling margins to 3, h-5
 
 	WCHAR* tmpMsg = malloc(sizeof(name));
@@ -93,10 +96,10 @@ void runClient()
 	free(tmpMsg);
 
 	PrintHorizontalBorder(cmdCols, TRUE);
-	printf(CSI "%d;1H", cmdRows - 4); // jump cursor
+	printf(CSI "%d;1H", cmdRows - 4);
 	PrintHorizontalBorder(cmdCols, FALSE);
 
-	printf(CSI "3;1H"); //jump to (1;3)
+	printf(CSI "3;1H");
 
 	name[nameLen++] = L'\x1b'; //ESC
 	name[nameLen++] = L'[';
@@ -127,7 +130,7 @@ void runClient()
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
 	int cursorPos = nameLen;
 	int msgLength = 0;
-	BOOL insert = FALSE;
+	BOOL insert = TRUE;
 
 	wcscpy_s(sendMsg, MAX_PACKET, name);
 
@@ -147,19 +150,15 @@ void runClient()
 		return;
 	}
 
+	printf(CSI "%d;1H" "message: " CSI "%i q" CSI "?25h", cmdRows - 3, (insert) ? 1 : 3);
+
 	for (;;)
 	{
 		switch (mouseWheel)
 		{
 		case -1: //down
 			mouseWheel = 0;
-			if (MAX_LINE_HISTORY == 0)
-			{
-				printf(CSI "S");
-				break;
-			}
-
-			if (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
+			if (MAX_LINE_HISTORY == 0 || ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
 			history_save_down(&scrolled, &lines, lines_size, line_size);
 			ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 			printf(CSI "S");
@@ -174,7 +173,7 @@ void runClient()
 			break;
 		}
 
-		while (_kbhit())
+		if (_kbhit())
 		{
 			WCHAR tmp = _getwch();
 			//printf("1 '%C' - %i\n", tmp, tmp);
@@ -188,10 +187,12 @@ void runClient()
 				case 77:	// right arrow
 					if (cursorPos == msgLength + nameLen) break;
 					cursorPos++;
+					printf((GetConsoleCursorPosition(cmd).X + 1 == cmdCols) ? CSI "E" : CSI "C");
 					break;
 				case 75:	// left arrow
 					if (cursorPos == nameLen) break;
 					cursorPos--;
+					printf((GetConsoleCursorPosition(cmd).X == 0) ? CSI "F" CSI "10000C" : CSI "D");
 					break;
 				case 116:	// ctrl + right arrow
 					break;
@@ -212,15 +213,6 @@ void runClient()
 				goto rec;
 			}
 
-			printf(ESC "7");
-
-			if (cursorPos == nameLen) printf(CSI "%d;1H" "message: ", cmdRows - 3);
-			else
-			{
-				int offset = cursorPos - nameLen + (int)(sizeof("message: ") - 1);
-				printf(CSI "%d;%dH", cmdRows - 3 + offset / cmdCols, offset % cmdCols + 1);
-			}
-
 			switch (tmp)
 			{
 			case L'\r':
@@ -233,11 +225,12 @@ void runClient()
 				if (sendMsg[cursorPos] == L'/') command_engine(&sendMsg[cursorPos + 1]);
 				else
 				{
+					StrTrimW(&sendMsg[nameLen], L" ");
 					iResult = my_wsend(&sock, sendMsg, &servaddr);
 					if (iResult == SOCKET_ERROR) return;
 				}
 
-				printf(CSI "%d;1H" CSI "2K\n" CSI "2K\n" CSI "2K\n" CSI "2K", cmdRows - 3); //clear bottom
+				printf(CSI "%d;1H" CSI "2K\n" CSI "2K\n" CSI "2K\n" CSI "2K" CSI "%d;1H" "message: ", cmdRows - 3, cmdRows - 3); //clear bottom
 				break;
 			case L'\b':
 				if (cursorPos > nameLen)
@@ -255,10 +248,8 @@ void runClient()
 				printf("%lc", tmp);
 				break;
 			}
-			
-			printf(ESC "8");
 		}
-
+		
 	rec:
 		iResult = my_wrecive(&sock, recvMsg, NULL);
 		if (iResult == SOCKET_ERROR)
@@ -267,6 +258,20 @@ void runClient()
 			return;
 		}
 		recvMsg[iResult] = '\0';
+
+		printf(CSI "?25l" ESC "7" CSI "%d;1H", (int)marginAbsBottom + 1);
+		COORD tmp_coord = { 0, marginAbsBottom - 1 };
+		// only loop from top to bottom when the 2. bottom line is empty (the last printable line)
+		if (ReadCharAtPos(cmd, tmp_coord) == L' ')
+		{
+			tmp_coord = (COORD){ 0, marginAbsTop };
+			for (;; ++tmp_coord.Y)
+			{
+				if (ReadCharAtPos(cmd, tmp_coord) != L' ') continue;
+				printf(CSI "%d;1H", tmp_coord.Y + 1);
+				break;
+			}
+		}
 
 		iResult -= 10;
 
@@ -294,13 +299,11 @@ void runClient()
 			}
 		}
 
-		WCHAR tmp_char = recvMsg[10];
+		printColoredText(&recvMsg[10], iResult);
+
 		recvMsg[10] = L'\0';
 		int count = _wtoi(recvMsg);
-		printf(ESC"7" CSI"1;%lluH" "user count: %i" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count);
-		recvMsg[10] = tmp_char;
-
-		printColoredText(&recvMsg[10], iResult);
+		printf(CSI"1;%lluH" "user count: %i" CSI"%i q" CSI"?25h" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count, (insert) ? 1 : 3);
 	}
 	closesocket(sock);
 }

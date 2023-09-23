@@ -15,6 +15,7 @@
 #include <stdlib.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "Shlwapi.lib")
 
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12) // fix for udp sending to disconnected client crash
 
