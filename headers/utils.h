@@ -29,6 +29,7 @@ void PrintVerticalBorder(int pos);
 void PrintHorizontalBorder(SHORT cols, BOOL fIsTop);
 void printEmptyLine();
 ULONGLONG GetEpochMs();
+void ip_to_wstring(WCHAR* buffer, DWORD bufferLen, SOCKADDR_IN* ip);
 int my_wrecive(SOCKET* socket, WCHAR* buffer, SOCKADDR_IN* senderAddr);
 int my_wsend(SOCKET* socket, WCHAR* msg, SOCKADDR_IN* serverAddr);
 BOOL set_addr(SOCKADDR_IN* addr);

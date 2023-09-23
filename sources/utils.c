@@ -220,6 +220,16 @@ ULONGLONG GetEpochMs()
 	return (ULONGLONG)tmp.dwLowDateTime | ((ULONGLONG)(tmp.dwHighDateTime) << 32LL);
 }
 
+void ip_to_wstring(WCHAR* buffer, DWORD bufferLen, SOCKADDR_IN* ip)
+{
+	int po = ip->sin_port;
+	ip->sin_port = 0;
+	DWORD tmpLen = bufferLen;
+	WSAAddressToStringW((SOCKADDR*)ip, sizeof(*ip), NULL, buffer, &tmpLen);
+	buffer[bufferLen - 1] = L'\0';
+	ip->sin_port = po;
+}
+
 int my_wrecive(SOCKET* socket, WCHAR* buffer, SOCKADDR_IN* senderAddr)
 {
 	int i = sizeof(*senderAddr);
@@ -251,7 +261,7 @@ BOOL set_addr(SOCKADDR_IN* addr)
 {
 	WCHAR ip_port[IPLEN + 1 + PORTLEN + 1]; // 255.255.255.255:65535\0
 
-	printf("address (x.y.z.w -> x.y.z.w:8080, :x -> 127.0.0.1:x, nothing -> 127.0.0.1:8080)\n(e.g.: 192.168.1.11:27015): ");
+	printf("address (x.y.z.w -> x.y.z.w:8080, :x -> 127.0.0.1:x, nothing -> 127.0.0.1:8080)\n(e.g.: 192.168.1.51:27015): ");
 	fgetws(ip_port, sizeof(ip_port) / sizeof(ip_port[0]), stdin);
 	int ip_portSize = wcslen(ip_port);
 	if (ip_port[ip_portSize - 1] == L'\n') ip_port[--ip_portSize] = L'\0';

@@ -1,0 +1,1 @@
+@ECHO OFF & title server & a.exe -s

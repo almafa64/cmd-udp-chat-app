@@ -31,6 +31,28 @@ BOOL CALLBACK ctrl_handler(DWORD dwCtrlType)
 	return TRUE;
 }
 
+void history_save_down(int* scrolled, CHAR_INFO* lines, size_t lines_size, size_t line_size)
+{
+	if (scrolled == MAX_LINE_HISTORY)
+	{
+		size_t lastLine = lines_size - line_size;
+		errno_t error = memcpy_s(lines, lines_size * sizeof(*lines), &lines[line_size], lastLine * sizeof(*lines));
+		if (error != 0)
+		{
+			printf("error while copying: %i", error);
+			return;
+		}
+		for (; lastLine < lines_size; ++lastLine)
+		{
+			PCHAR_INFO tmp = &lines[lastLine];
+			tmp->Char.UnicodeChar = L' ';
+			tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
+		}
+
+		--scrolled;
+	}
+}
+
 void runClient()
 {
 	printf("this is client\n");
@@ -103,7 +125,9 @@ void runClient()
 
 	WCHAR recvMsg[MAX_PACKET] = { 0 };
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
-	int realMsgLength = nameLen, printMsgLength = sizeof("message: ") - 1;
+	int cursorPos = nameLen;
+	int msgLength = 0;
+	BOOL insert = FALSE;
 
 	wcscpy_s(sendMsg, MAX_PACKET, name);
 
@@ -136,24 +160,7 @@ void runClient()
 			}
 
 			if (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
-			if (scrolled == MAX_LINE_HISTORY)
-			{
-				size_t lastLine = lines_size - line_size;
-				errno_t error = memcpy_s(lines, lines_size * sizeof(*lines), &lines[line_size], lastLine * sizeof(*lines));
-				if (error != 0)
-				{
-					printf("error while copying: %i", error);
-					return;
-				}
-				for (; lastLine < lines_size; ++lastLine)
-				{
-					PCHAR_INFO tmp = &lines[lastLine];
-					tmp->Char.UnicodeChar = L' ';
-					tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
-				}
-
-				--scrolled;
-			}
+			history_save_down(&scrolled, &lines, lines_size, line_size);
 			ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 			printf(CSI "S");
 			WriteLine(cmd, &lines[line_size * (marginHeight + ++scrolled)], cmdCols, marginAbsBottom);
@@ -170,30 +177,60 @@ void runClient()
 		while (_kbhit())
 		{
 			WCHAR tmp = _getwch();
+			//printf("1 '%C' - %i\n", tmp, tmp);
 			if (isEscape(tmp))
 			{
+				/*WCHAR a = _getwch();
+				printf("2 '%C' - %i\n", a, a);*/
 				switch (_getwch())
 				{
-					// TODO idk
+							// TODO special key functions (ctrl + left/right arrow)
+				case 77:	// right arrow
+					if (cursorPos == msgLength + nameLen) break;
+					cursorPos++;
+					break;
+				case 75:	// left arrow
+					if (cursorPos == nameLen) break;
+					cursorPos--;
+					break;
+				case 116:	// ctrl + right arrow
+					break;
+				case 115:	// ctrl + left arrow
+					break;
+				case 82:	// insert
+					insert = !insert;
+					break;
+				case 83:	// del
+					break;
+				case 118:	// ctrl + del
+					break;
 				}
+				goto rec;
+			}
+			else if (tmp == 127) // ctrl + backspace (127)
+			{
 				goto rec;
 			}
 
 			printf(ESC "7");
 
-			if (realMsgLength == nameLen)	printf(CSI "%d;1H" "message: ", cmdRows - 3);
-			else							printf(CSI "%d;%dH", cmdRows - 3 + printMsgLength / cmdCols, printMsgLength % cmdCols + 1);
+			if (cursorPos == nameLen) printf(CSI "%d;1H" "message: ", cmdRows - 3);
+			else
+			{
+				int offset = cursorPos - nameLen + (int)(sizeof("message: ") - 1);
+				printf(CSI "%d;%dH", cmdRows - 3 + offset / cmdCols, offset % cmdCols + 1);
+			}
 
 			switch (tmp)
 			{
 			case L'\r':
 			case L'\n':
-				sendMsg[realMsgLength] = L'\0';
+				sendMsg[msgLength + nameLen] = L'\0';
 
-				realMsgLength = nameLen;
-				printMsgLength = sizeof("message: ") - 1;
+				cursorPos = nameLen;
+				msgLength = 0;
 
-				if (sendMsg[realMsgLength] == L'/') command_engine(&sendMsg[realMsgLength + 1]);
+				if (sendMsg[cursorPos] == L'/') command_engine(&sendMsg[cursorPos + 1]);
 				else
 				{
 					iResult = my_wsend(&sock, sendMsg, &servaddr);
@@ -203,22 +240,22 @@ void runClient()
 				printf(CSI "%d;1H" CSI "2K\n" CSI "2K\n" CSI "2K\n" CSI "2K", cmdRows - 3); //clear bottom
 				break;
 			case L'\b':
-				if (realMsgLength > nameLen)
+				if (cursorPos > nameLen)
 				{
-					--realMsgLength;
-					--printMsgLength;
-					printf(CSI "D" CSI "P");
+					if(!insert || cursorPos == msgLength + nameLen) --msgLength;
+					--cursorPos;
+					printf(CSI "D" CSI "X");
 				}
 				break;
 			default:
-				if (realMsgLength >= MAX_PACKET - 10 - 1) break;	// <user count (10 number)><name> + \0
-				sendMsg[realMsgLength] = tmp;
-				++printMsgLength;
-				++realMsgLength;
+				if (cursorPos >= MAX_PACKET - 10 - 1) break;	// <user count (10 number)><name> + <max text> + \0
+				sendMsg[cursorPos] = tmp;
+				if(!insert || cursorPos == msgLength + nameLen) ++msgLength;
+				++cursorPos;
 				printf("%lc", tmp);
 				break;
 			}
-
+			
 			printf(ESC "8");
 		}
 
@@ -240,28 +277,10 @@ void runClient()
 
 			if (yAbsPos > marginHeight)
 			{
-				for (;;) //scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
+				for (;;) // scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
 				{
-					//TODO make function "void history_save_write_down()" (extend "void history_save_down()")
 					if (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
-					if (scrolled == MAX_LINE_HISTORY)
-					{
-						size_t lastLine = lines_size - line_size;
-						errno_t error = memcpy_s(lines, lines_size * sizeof(*lines), &lines[line_size], lastLine * sizeof(*lines));
-						if (error != 0)
-						{
-							printf("error while copying: %i", error);
-							return;
-						}
-						for (; lastLine < lines_size; ++lastLine)
-						{
-							PCHAR_INFO tmp = &lines[lastLine];
-							tmp->Char.UnicodeChar = L' ';
-							tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
-						}
-
-						--scrolled;
-					}
+					history_save_down(&scrolled, &lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 					printf(CSI "S");
 					WriteLine(cmd, &lines[line_size * (marginHeight + ++scrolled)], cmdCols, marginAbsBottom);
@@ -269,35 +288,17 @@ void runClient()
 
 				for (int i = 0; i < n; ++i)
 				{
-					//TODO make function "void history_save_down()"
-					if (scrolled == MAX_LINE_HISTORY)
-					{
-						size_t lastLine = lines_size - line_size;
-						errno_t error = memcpy_s(lines, lines_size * sizeof(*lines), &lines[line_size], lastLine * sizeof(*lines));
-						if (error != 0)
-						{
-							printf("error while copying: %i", error);
-							return;
-						}
-						for (; lastLine < lines_size; ++lastLine)
-						{
-							PCHAR_INFO tmp = &lines[lastLine];
-							tmp->Char.UnicodeChar = L' ';
-							tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
-						}
-
-						--scrolled;
-					}
+					history_save_down(&scrolled, &lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled++)], cmdCols, marginAbsTop + i);
 				}
 			}
 		}
 
-		/*WCHAR tmp_char = recvMsg[10];
+		WCHAR tmp_char = recvMsg[10];
 		recvMsg[10] = L'\0';
 		int count = _wtoi(recvMsg);
 		printf(ESC"7" CSI"1;%lluH" "user count: %i" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count);
-		recvMsg[10] = tmp_char;*/
+		recvMsg[10] = tmp_char;
 
 		printColoredText(&recvMsg[10], iResult);
 	}

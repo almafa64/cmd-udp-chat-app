@@ -21,7 +21,7 @@
 #define IPLEN 15
 #define PORTLEN 5
 #define MAX_CONNECTIONS 20
-#define TIMEOUTMS (20 * 1000)
+#define TIMEOUT 20
 #define MAX_PACKET 1024			// with default name (anom) you can write MAX_PACKET - 20 characters
 #define MAX_LINE_HISTORY 20
 

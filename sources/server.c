@@ -17,34 +17,21 @@ DWORD WINAPI timeoutThreadCallback(LPVOID param)
 {
 	User* connects = ((TimeoutThreadParam*)param)->connects;
 	int* curConnects = ((TimeoutThreadParam*)param)->curConnects;
-	UINT64 prev_time = GetEpochMs();									//TODO SLEEEP!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	WCHAR addressBuffer[IPLEN + 1]; // 255.255.255.255\0
 	for (;;)
 	{
-		UINT64 time = GetEpochMs();
-		if (time - prev_time < 10000) continue;
-
-		prev_time = time;
-		//for (int i = 0; i < MAX_CONNECTIONS; ++i)
+		Sleep(1000);
 		for (int i = 0; i < *curConnects; ++i)
 		{
-			//if (connects[i].ip.sin_port == 0) break;
 			if (--connects[i].timeout > 0) continue;
 
-			WCHAR addressBuffer[IPLEN + 1]; // 255.255.255.255\0							//TODO wrap in function
-			DWORD addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
-			int po = connects[i].ip.sin_port;
-			connects[i].ip.sin_port = 0;													//TODO break connection
-			WSAAddressToStringW((SOCKADDR*)&connects[i].ip, sizeof(connects[i].ip), NULL, addressBuffer, &addressBufferLen);
-			addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
-			addressBuffer[addressBufferLen - 1] = L'\0';
+			ip_to_wstring(addressBuffer, sizeof(addressBuffer) / sizeof(addressBuffer[0]), &connects[i].ip);
 
-			printf("[%i]: %ls:%i timed out\n", i, addressBuffer, po);
+			printf("[%i]: %ls:%i timed out\n", i, addressBuffer, connects[i].ip.sin_port);
 
-			//for (int k = i + 1; k < MAX_CONNECTIONS - i; ++k)
 			for (int k = i + 1; k < *curConnects; ++k)
 			{
 				connects[k - 1] = connects[k];
-				//if (connects[k].ip.sin_port == 0) break;
 			}
 
 			--i;
@@ -77,12 +64,9 @@ void runServer()
 
 	WCHAR recvBuf[MAX_PACKET] = { 0 };
 	WCHAR addressBuffer[IPLEN + 1]; // 255.255.255.255\0
-	DWORD addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
 
-	//TODO left shift all non NULL after remove
 	User connections[MAX_CONNECTIONS];
 	int curConnects = 0;
-
 	int prevCurConnects = 0;
 
 	ZeroMemory(&connections, sizeof(connections));
@@ -126,13 +110,7 @@ void runServer()
 
 		recvBuf[iResult + 10] = L'\0';
 
-		int po = senderAddr.sin_port;
-		senderAddr.sin_port = 0;
-		WSAAddressToStringW((SOCKADDR*)&senderAddr, sizeof(senderAddr), NULL, addressBuffer, &addressBufferLen);
-		addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
-		addressBuffer[addressBufferLen - 1] = L'\0';
-		senderAddr.sin_port = po;
-
+		ip_to_wstring(addressBuffer, sizeof(addressBuffer) / sizeof(addressBuffer[0]), &senderAddr);
 		printf("message received \"%ls\" from %ls:%i\n", &recvBuf[10], addressBuffer, senderAddr.sin_port);
 
 		int place = find_addr_in_users(&senderAddr, connections);
@@ -140,14 +118,13 @@ void runServer()
 		{
 			place = curConnects;
 			connections[place].ip = senderAddr;
-			printf("added %ls:%i to list with timeout %ums\n", addressBuffer, senderAddr.sin_port, TIMEOUTMS);
+			printf("added %ls:%i to list with timeout %us\n", addressBuffer, senderAddr.sin_port, TIMEOUT);
 			++curConnects;
 		}
 
-		connections[place].timeout = TIMEOUTMS;
+		connections[place].timeout = TIMEOUT;
 
 		if (iResult < 1) continue;
-
 
 		WCHAR tmp_char = recvBuf[10];
 		swprintf(recvBuf, sizeof(recvBuf) / sizeof(recvBuf[0]), L"%.10i", curConnects);
@@ -158,15 +135,9 @@ void runServer()
 			SOCKADDR_IN tmp = connections[i].ip;
 			if (tmp.sin_port != 0)
 			{
-				int po = tmp.sin_port;
-				tmp.sin_port = 0;
-				WSAAddressToStringW((SOCKADDR*)&tmp.sin_addr, sizeof(tmp), NULL, addressBuffer, &addressBufferLen);
-				addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
-				addressBuffer[addressBufferLen - 1] = L'\0';
-				tmp.sin_port = po;
+				ip_to_wstring(addressBuffer, sizeof(addressBuffer) / sizeof(addressBuffer[0]), &tmp);
 				printf("[%i]: sending \"%ls\" to %ls:%i\n", i, &recvBuf[10], addressBuffer, tmp.sin_port);
-				iResult = my_wsend(&sock, recvBuf, &tmp);
-				if (iResult == SOCKET_ERROR) return;
+				if (my_wsend(&sock, recvBuf, &tmp) == SOCKET_ERROR) return;
 			}
 		}
 	}
