@@ -2,6 +2,11 @@
 #include "utils.h"
 #include "shlwapi.h"
 
+int cursorPos = 0;
+int nameLen = 0;
+int msgLength = 0;
+BOOL insert = TRUE;
+
 LRESULT CALLBACK MouseHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
 	if (nCode != HC_ACTION || GetForegroundWindow() != cmdWindow) return CallNextHookEx(NULL, nCode, wParam, lParam);
@@ -50,7 +55,125 @@ void history_save_down(int* scrolled, CHAR_INFO* lines, size_t lines_size, size_
 			tmp->Attributes = FOREGROUND_BRIGHT_WHITE;
 		}
 
-		--*scrolled;
+		-- * scrolled;
+	}
+}
+
+BOOL move_left()
+{
+	if (cursorPos == 0) return TRUE;
+	cursorPos--;
+	printf((GetConsoleCursorPosition(cmd).X == 0) ? CSI "F" CSI "32767C" : CSI "D");
+	return FALSE;
+}
+
+BOOL move_right()
+{
+	if (cursorPos == msgLength) return TRUE;
+	cursorPos++;
+	printf((GetConsoleCursorPosition(cmd).X + 1 == cmdCols) ? CSI "E" : CSI "C");
+	return FALSE;
+}
+
+void msg_normal_insert_shift_from(WCHAR* msg, int index)
+{
+	if (index > msgLength) return;
+	int n = index + nameLen;
+	for (int i = msgLength + nameLen; n <= i; --i)
+	{
+		msg[i] = msg[i - 1];
+	}
+	++msgLength;
+	msg[msgLength + nameLen] = L'\0';
+	int offset = index + sizeof("message: ") - 1;
+	COORD tmp = { offset % cmdCols, cmdRows - 4 + offset / cmdCols };
+	SetConsoleCursorPosition(cmd, tmp);
+	printf("%S ", &msg[n]);
+	SetConsoleCursorPosition(cmd, tmp);
+}
+
+void msg_del_shift_from(WCHAR* msg, int index)
+{
+	if (index >= msgLength) return;
+	int offset = index + sizeof("message: ") - 1;
+	COORD tmp = { offset % cmdCols, cmdRows - 4 + offset / cmdCols };
+	SetConsoleCursorPosition(cmd, tmp);
+	--msgLength;
+	for (int i = index; i < msgLength; ++i)
+	{
+		msg[i + nameLen] = msg[i + nameLen + 1];
+	}
+	msg[msgLength + nameLen] = L'\0';
+	printf("%S ", &msg[nameLen + index]);
+	SetConsoleCursorPosition(cmd, tmp);
+}
+
+void msg_backspace_shift_from(WCHAR* msg, int index)
+{
+	if (index <= 0) return;
+	int offset = index + sizeof("message: ") - 1;
+	COORD tmp = { offset % cmdCols, cmdRows - 4 + offset / cmdCols };
+	SetConsoleCursorPosition(cmd, tmp);
+	move_left();
+	tmp = GetConsoleCursorPosition(cmd);
+	--msgLength;
+	--index;
+	for (int i = index; i < msgLength; ++i)
+	{
+		msg[i + nameLen] = msg[i + nameLen + 1];
+	}
+	msg[msgLength + nameLen] = L'\0';
+	printf("%S ", &msg[nameLen + index]);
+	SetConsoleCursorPosition(cmd, tmp);
+}
+
+BOOL delete_char(WCHAR* msg, int move_dir)
+{
+	if (move_dir == -1)
+	{
+		if (cursorPos == 0) return TRUE;
+	}
+	else if (move_dir == 1)
+	{
+		if (cursorPos == msgLength) return TRUE;
+	}
+
+	switch (move_dir)
+	{
+	case 1: msg_del_shift_from(msg, cursorPos); break;
+	case -1: msg_backspace_shift_from(msg, cursorPos); break;
+	}
+
+	return FALSE;
+}
+
+void ctrl_things(BOOL dir_right, BOOL do_delete_char, WCHAR* msg)
+{
+	BOOL isText = FALSE;
+	SHORT x_offset = (!dir_right && do_delete_char) ? 1 : 0;
+	for (;;)
+	{
+		COORD tmp = GetConsoleCursorPosition(cmd);
+		tmp.X -= x_offset;
+		WCHAR tmp_char = ReadCharAtPos(cmd, tmp);
+		if (isText)
+		{
+			if (tmp_char == L' ') break;
+		}
+		else if (tmp_char != L' ') isText = TRUE;
+
+		if (do_delete_char)
+		{
+			if (delete_char(msg, dir_right ? 1 : -1)) break;
+		}
+		else if (dir_right)
+		{
+			if (move_right()) break;
+		}
+		else
+		{
+			if (move_left()) break;
+		}
 	}
 }
 
@@ -71,7 +194,7 @@ void runClient()
 	fflush(stdin);
 	fflush(stdout);
 	fgetws(name, 31, stdin);
-	int nameLen = wcslen(name);
+	nameLen = wcslen(name);
 	if (name[nameLen - 1] == L'\n') --nameLen;
 	name[nameLen] = L'\0';
 	StrTrimW(name, L" ");
@@ -110,7 +233,8 @@ void runClient()
 
 	// SCROLL MARGIN
 	size_t marginHeight = (((size_t)cmdRows) - 5) - 3;
-	size_t marginAbsBottom = ((size_t)cmdRows) - 5 - 1, marginAbsTop = (size_t)3 - 1;
+	size_t marginAbsBottom = ((size_t)cmdRows) - 5 - 1;
+	size_t marginAbsTop = (size_t)3 - 1;
 	int yAbsPos = 0;
 	size_t line_size = cmdCols;
 	size_t lines_size = line_size * (MAX_LINE_HISTORY + 1 + marginHeight);
@@ -128,9 +252,6 @@ void runClient()
 
 	WCHAR recvMsg[MAX_PACKET] = { 0 };
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
-	int cursorPos = nameLen;
-	int msgLength = 0;
-	BOOL insert = TRUE;
 
 	wcscpy_s(sendMsg, MAX_PACKET, name);
 
@@ -176,40 +297,38 @@ void runClient()
 		if (_kbhit())
 		{
 			WCHAR tmp = _getwch();
-			//printf("1 '%C' - %i\n", tmp, tmp);
 			if (isEscape(tmp))
 			{
-				/*WCHAR a = _getwch();
-				printf("2 '%C' - %i\n", a, a);*/
 				switch (_getwch())
 				{
-							// TODO special key functions (ctrl + left/right arrow)
 				case 77:	// right arrow
-					if (cursorPos == msgLength + nameLen) break;
-					cursorPos++;
-					printf((GetConsoleCursorPosition(cmd).X + 1 == cmdCols) ? CSI "E" : CSI "C");
+					move_right();
 					break;
 				case 75:	// left arrow
-					if (cursorPos == nameLen) break;
-					cursorPos--;
-					printf((GetConsoleCursorPosition(cmd).X == 0) ? CSI "F" CSI "10000C" : CSI "D");
+					move_left();
 					break;
 				case 116:	// ctrl + right arrow
+					ctrl_things(TRUE, FALSE, sendMsg);
 					break;
 				case 115:	// ctrl + left arrow
+					ctrl_things(FALSE, FALSE, sendMsg);
 					break;
 				case 82:	// insert
 					insert = !insert;
+					printf(insert ? CSI "1 q": CSI "3 q");
 					break;
 				case 83:	// del
+					delete_char(sendMsg, 1);
 					break;
-				case 118:	// ctrl + del
+				case 147:	// ctrl + del
+					ctrl_things(TRUE, TRUE, sendMsg);
 					break;
 				}
 				goto rec;
 			}
 			else if (tmp == 127) // ctrl + backspace (127)
 			{
+				ctrl_things(FALSE, TRUE, sendMsg);
 				goto rec;
 			}
 
@@ -219,10 +338,9 @@ void runClient()
 			case L'\n':
 				sendMsg[msgLength + nameLen] = L'\0';
 
-				cursorPos = nameLen;
-				msgLength = 0;
+				cursorPos = msgLength = 0;
 
-				if (sendMsg[cursorPos] == L'/') command_engine(&sendMsg[cursorPos + 1]);
+				if (sendMsg[cursorPos + nameLen] == L'/') command_engine(&sendMsg[cursorPos + nameLen + 1]);
 				else
 				{
 					StrTrimW(&sendMsg[nameLen], L" ");
@@ -233,23 +351,18 @@ void runClient()
 				printf(CSI "%d;1H" CSI "2K\n" CSI "2K\n" CSI "2K\n" CSI "2K" CSI "%d;1H" "message: ", cmdRows - 3, cmdRows - 3); //clear bottom
 				break;
 			case L'\b':
-				if (cursorPos > nameLen)
-				{
-					if(!insert || cursorPos == msgLength + nameLen) --msgLength;
-					--cursorPos;
-					printf(CSI "D" CSI "X");
-				}
+				delete_char(sendMsg, -1);
 				break;
 			default:
-				if (cursorPos >= MAX_PACKET - 10 - 1) break;	// <user count (10 number)><name> + <max text> + \0
-				sendMsg[cursorPos] = tmp;
-				if(!insert || cursorPos == msgLength + nameLen) ++msgLength;
+				if (cursorPos + nameLen >= MAX_PACKET - 10 - 1) break;	// <user count (10 number)><name> + <max text> + \0
+				if(!insert || cursorPos == msgLength) msg_normal_insert_shift_from(sendMsg, cursorPos);
+				sendMsg[cursorPos + nameLen] = tmp;
 				++cursorPos;
 				printf("%lc", tmp);
 				break;
 			}
 		}
-		
+
 	rec:
 		iResult = my_wrecive(&sock, recvMsg, NULL);
 		if (iResult == SOCKET_ERROR)

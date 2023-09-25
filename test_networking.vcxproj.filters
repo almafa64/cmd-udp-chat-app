@@ -15,36 +15,36 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.c">
+    <ClCompile Include="sources\args.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="args.c">
+    <ClCompile Include="sources\client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="utils.c">
+    <ClCompile Include="sources\main.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="client.c">
+    <ClCompile Include="sources\server.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="server.c">
+    <ClCompile Include="sources\utils.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="args.h">
+    <ClInclude Include="headers\args.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="main.h">
+    <ClInclude Include="headers\client.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="server.h">
+    <ClInclude Include="headers\main.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="client.h">
+    <ClInclude Include="headers\server.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utils.h">
+    <ClInclude Include="headers\utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

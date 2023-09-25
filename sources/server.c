@@ -29,6 +29,8 @@ DWORD WINAPI timeoutThreadCallback(LPVOID param)
 
 			printf("[%i]: %ls:%i timed out\n", i, addressBuffer, connects[i].ip.sin_port);
 
+			connects[i].ip.sin_port = 0;
+
 			for (int k = i + 1; k < *curConnects; ++k)
 			{
 				connects[k - 1] = connects[k];
