@@ -250,6 +250,8 @@ void runClient()
 		lines[i].Attributes = FOREGROUND_BRIGHT_WHITE;
 	}
 
+	int maxMsg = 4 * cmdCols - sizeof("message: ");
+
 	WCHAR recvMsg[MAX_PACKET] = { 0 };
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
 
@@ -354,12 +356,15 @@ void runClient()
 				delete_char(sendMsg, -1);
 				break;
 			default:
-				if (cursorPos + nameLen >= MAX_PACKET - 10 - 1) break;	// <user count (10 number)><name> + <max text> + \0
-				if(!insert || cursorPos == msgLength) msg_normal_insert_shift_from(sendMsg, cursorPos);
-				sendMsg[cursorPos + nameLen] = tmp;
-				++cursorPos;
-				printf("%lc", tmp);
-				break;
+				{
+					int cursorReal = cursorPos + nameLen;
+					if (cursorReal >= MAX_PACKET - 10 - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
+					if (!insert || cursorPos == msgLength) msg_normal_insert_shift_from(sendMsg, cursorPos);
+					sendMsg[cursorReal] = tmp;
+					++cursorPos;
+					printf("%lc", tmp);
+					break;
+				}
 			}
 		}
 
