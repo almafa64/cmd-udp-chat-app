@@ -16,6 +16,7 @@
 
 int ctoh(char ch);
 int int_length(int num);
+BOOL is_wnumber(WCHAR* text, int len);
 void handleWSAError(size_t line);
 COORD GetConsoleCursorPosition(HANDLE hConsoleOutput);
 BOOL GetConsoleSize(HANDLE hConsoleOutput, SHORT* cols, SHORT* rows, SHORT* top);

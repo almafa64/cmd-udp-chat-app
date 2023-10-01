@@ -75,6 +75,22 @@ BOOL move_right()
 	return FALSE;
 }
 
+BOOL move_up()
+{
+	if (cursorPos - cmdCols < 0) return TRUE;
+	cursorPos -= cmdCols;
+	printf(CSI "A");
+	return FALSE;
+}
+
+BOOL move_down()
+{
+	if (cursorPos + cmdCols > msgLength) return TRUE;
+	cursorPos += cmdCols;
+	printf(CSI "B");
+	return FALSE;
+}
+
 void msg_normal_insert_shift_from(WCHAR* msg, int index)
 {
 	if (index > msgLength) return;
@@ -309,6 +325,12 @@ void runClient()
 				case 75:	// left arrow
 					move_left();
 					break;
+				case 80:	// down arrow
+					move_down();
+					break;
+				case 72:	// up arrow
+					move_up();
+					break;
 				case 116:	// ctrl + right arrow
 					ctrl_things(TRUE, FALSE, sendMsg);
 					break;
@@ -317,7 +339,7 @@ void runClient()
 					break;
 				case 82:	// insert
 					insert = !insert;
-					printf(insert ? CSI "1 q": CSI "3 q");
+					printf(insert ? CSI "1 q" : CSI "3 q");
 					break;
 				case 83:	// del
 					delete_char(sendMsg, 1);
@@ -358,7 +380,8 @@ void runClient()
 			default:
 				{
 					int cursorReal = cursorPos + nameLen;
-					if (cursorReal >= MAX_PACKET - 10 - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
+					//if (cursorReal >= MAX_PACKET - 10 - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
+					if (cursorReal >= MAX_PACKET - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
 					if (!insert || cursorPos == msgLength) msg_normal_insert_shift_from(sendMsg, cursorPos);
 					sendMsg[cursorReal] = tmp;
 					++cursorPos;
@@ -369,13 +392,14 @@ void runClient()
 		}
 
 	rec:
+#pragma region PUT_IN_ASYNC
 		iResult = my_wrecive(&sock, recvMsg, NULL);
 		if (iResult == SOCKET_ERROR)
 		{
 			if (WSAGetLastError() == WSAETIMEDOUT) continue;
 			return;
 		}
-		recvMsg[iResult] = '\0';
+#pragma endregion
 
 		printf(CSI "?25l" ESC "7" CSI "%d;1H", (int)marginAbsBottom + 1);
 		COORD tmp_coord = { 0, marginAbsBottom - 1 };
@@ -391,7 +415,21 @@ void runClient()
 			}
 		}
 
-		iResult -= 10;
+#pragma region PUT_IN_ASYNC
+		WCHAR tmp_wch = recvMsg[10];
+		recvMsg[10] = L'\0';
+
+		if (iResult == 10 && is_wnumber(recvMsg, 10)) // doesnt work without async because cursor moving too slow
+		{
+			printf("good");
+			continue;
+		}
+
+		recvMsg[10] = tmp_wch;
+		recvMsg[iResult] = L'\0';
+#pragma endregion
+
+		//iResult -= 10;
 
 		if (MAX_LINE_HISTORY != 0)
 		{
@@ -417,11 +455,12 @@ void runClient()
 			}
 		}
 
-		printColoredText(&recvMsg[10], iResult);
+		printColoredText(recvMsg, iResult);
+		/*printColoredText(&recvMsg[10], iResult);
 
 		recvMsg[10] = L'\0';
 		int count = _wtoi(recvMsg);
-		printf(CSI"1;%lluH" "user count: %i" CSI"%i q" CSI"?25h" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count, (insert) ? 1 : 3);
+		printf(CSI"1;%lluH" "user count: %i" CSI"%i q" CSI"?25h" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count, (insert) ? 1 : 3);*/
 	}
 	closesocket(sock);
 }

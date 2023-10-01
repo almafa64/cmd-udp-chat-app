@@ -53,6 +53,15 @@ int int_length(int num)
 	}
 }
 
+BOOL is_wnumber(WCHAR* text, int len)
+{
+	for (int i = 0; i < len; ++i)
+	{
+		if (!iswdigit(text[i])) return FALSE;
+	}
+	return TRUE;
+}
+
 void handleWSAError(size_t line)
 {
 	char* errMsg;
@@ -455,6 +464,7 @@ You can color your texts (and even your name) with the paragraph symbol ('§') a
 
 */
 /*
+a = """<string>"""
 for e in a.split("\n"):
 	if(e == ""): print("echo:", end="&")
 	else:
