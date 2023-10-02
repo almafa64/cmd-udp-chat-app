@@ -268,7 +268,6 @@ void runClient()
 
 	int maxMsg = 4 * cmdCols - sizeof("message: ");
 
-	WCHAR recvMsg[MAX_PACKET] = { 0 };
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
 
 	wcscpy_s(sendMsg, MAX_PACKET, name);
@@ -286,6 +285,14 @@ void runClient()
 	if (mouseThread == NULL)
 	{
 		printf("error while making mouse thread: %li\n", GetLastError());
+		return;
+	}
+
+	int prevCount = 0;
+	HANDLE recvThread = CreateThread(NULL, 0, reciveThread, NULL, 0, NULL);
+	if (recvThread == NULL)
+	{
+		printf("error while making recive thread: %li\n", GetLastError());
 		return;
 	}
 
@@ -380,7 +387,6 @@ void runClient()
 			default:
 				{
 					int cursorReal = cursorPos + nameLen;
-					//if (cursorReal >= MAX_PACKET - 10 - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
 					if (cursorReal >= MAX_PACKET - 1 || cursorPos >= maxMsg) break; // <user count (10 number)><name> + <max text> + \0
 					if (!insert || cursorPos == msgLength) msg_normal_insert_shift_from(sendMsg, cursorPos);
 					sendMsg[cursorReal] = tmp;
@@ -392,14 +398,6 @@ void runClient()
 		}
 
 	rec:
-#pragma region PUT_IN_ASYNC
-		iResult = my_wrecive(&sock, recvMsg, NULL);
-		if (iResult == SOCKET_ERROR)
-		{
-			if (WSAGetLastError() == WSAETIMEDOUT) continue;
-			return;
-		}
-#pragma endregion
 
 		printf(CSI "?25l" ESC "7" CSI "%d;1H", (int)marginAbsBottom + 1);
 		COORD tmp_coord = { 0, marginAbsBottom - 1 };
@@ -415,21 +413,21 @@ void runClient()
 			}
 		}
 
-#pragma region PUT_IN_ASYNC
-		WCHAR tmp_wch = recvMsg[10];
-		recvMsg[10] = L'\0';
+		if (reciveFirst->recived[0] == L'\0') continue;
 
-		if (iResult == 10 && is_wnumber(recvMsg, 10)) // doesnt work without async because cursor moving too slow
+		WCHAR* recvMsg = reciveFirst->recived;
+		iResult = wcslen(recvMsg);
+
+		if (iResult == 10 && is_wnumber(recvMsg, iResult))
 		{
-			printf("good");
-			continue;
+			COORD tmp_cursor = GetConsoleCursorPosition(cmd);
+
+			int count = _wtoi(recvMsg);
+			printf(CSI"1;%lluH" "user count: %i", line_size - sizeof("user count: ") + 2 - int_length(count), count);
+
+			SetConsoleCursorPosition(cmd, tmp_cursor);
+			goto end;
 		}
-
-		recvMsg[10] = tmp_wch;
-		recvMsg[iResult] = L'\0';
-#pragma endregion
-
-		//iResult -= 10;
 
 		if (MAX_LINE_HISTORY != 0)
 		{
@@ -438,9 +436,8 @@ void runClient()
 
 			if (yAbsPos > marginHeight)
 			{
-				for (;;) // scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
+				while (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) != L' ') // scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
 				{
-					if (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ') break;
 					history_save_down(&scrolled, lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
 					printf(CSI "S");
@@ -456,11 +453,12 @@ void runClient()
 		}
 
 		printColoredText(recvMsg, iResult);
-		/*printColoredText(&recvMsg[10], iResult);
-
-		recvMsg[10] = L'\0';
-		int count = _wtoi(recvMsg);
-		printf(CSI"1;%lluH" "user count: %i" CSI"%i q" CSI"?25h" ESC"8", line_size - sizeof("user count: ") + 2 - int_length(count), count, (insert) ? 1 : 3);*/
+	end:
+		if (reciveFirst->next != NULL)
+		{
+			reciveFirst = reciveFirst->next;
+			deleteReciveNode(reciveFirst->prev);
+		}
+		else recvMsg[0] = L'\0';
 	}
-	closesocket(sock);
 }

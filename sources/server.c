@@ -24,7 +24,6 @@ BOOL send_to_everyone(User* connections, WCHAR* addressBuffer, DWORD addressBuff
 			if (addressBuffer != NULL)
 			{
 				ip_to_wstring(addressBuffer, addressBufferLen, &tmp);
-				//printf("[%i]: sending \"%ls\" to %ls:%i\n", i, &recvBuf[10], addressBuffer, tmp.sin_port);
 				printf("[%i]: sending \"%ls\" to %ls:%i\n", i, msg, addressBuffer, tmp.sin_port);
 			}
 			if (my_wsend(&sock, msg, &tmp) == SOCKET_ERROR) return TRUE;
@@ -47,22 +46,22 @@ DWORD WINAPI timeoutThreadCallback(LPVOID param)
 
 			ip_to_wstring(addressBuffer, addressBufferLen, &connects[i].ip);
 
-			//printf("[%i]: %ls:%i timed out\n", i, addressBuffer, connects[i].ip.sin_port);
-
 			int len = addressBufferLen + sizeof(":") - 1 + int_length(connects[i].ip.sin_port) + sizeof(" timed out") - 1;
 			WCHAR* buf = malloc(len * sizeof(addressBuffer[0]));
-			if (buf)
-			{
-				swprintf(buf, len, L"%ls:%i timed out", addressBuffer, connects[i].ip.sin_port);
-				send_to_everyone(connects, NULL, 0, buf);
-				printf("[%i]: %S\n", i, buf);
-				free(buf);
-			}
+			if (buf) swprintf(buf, len, L"%ls:%i timed out", addressBuffer, connects[i].ip.sin_port);
+			
 			connects[i].ip.sin_port = 0;
 
 			for (int k = i + 1; k < curConnects; ++k)
 			{
 				connects[k - 1] = connects[k];
+			}
+
+			if (buf)
+			{
+				send_to_everyone(connects, NULL, 0, buf);
+				printf("[%i]: %S\n", i, buf);
+				free(buf);
 			}
 
 			--i;
@@ -124,6 +123,15 @@ void runServer()
 		return;
 	}
 
+	/*SOCKADDR_IN recvIps[sizeof(revcivedMsgs) / sizeof(revcivedMsgs[0])] = { 0 };
+	ReciveThreadParam param2 = { recvIps };
+	HANDLE recvThread = CreateThread(NULL, 0, reciveThread, &param2, 0, NULL);
+	if (recvThread == NULL)
+	{
+		printf("error while making recive thread: %li\n", GetLastError());
+		return;
+	}*/
+
 	for (;;)
 	{
 		if (prevCurConnects != curConnects)
@@ -139,24 +147,12 @@ void runServer()
 			}
 		}
 
-		/*iResult = my_wrecive(&sock, &recvBuf[10], &senderAddr);
-		if (iResult == SOCKET_ERROR)
-		{
-			if (WSAGetLastError() == WSAETIMEDOUT) continue;
-			else return;
-		}
-
-		recvBuf[iResult + 10] = L'\0';
-
-		ip_to_wstring(addressBuffer, addressBufferLen, &senderAddr);
-		printf("message received \"%ls\" from %ls:%i\n", &recvBuf[10], addressBuffer, senderAddr.sin_port);*/
-
 #pragma region PUT_IN_ASYNC
 		iResult = my_wrecive(&sock, recvBuf, &senderAddr);
 		if (iResult == SOCKET_ERROR)
 		{
 			if (WSAGetLastError() == WSAETIMEDOUT) continue;
-			else return;
+			else break;
 		}
 		recvBuf[iResult] = L'\0';
 #pragma endregion
@@ -177,12 +173,6 @@ void runServer()
 
 		if (iResult < 1) continue;
 
-		/*WCHAR tmp_char = recvBuf[10];
-		swprintf(recvBuf, sizeof(recvBuf) / sizeof(recvBuf[0]), L"%.10i", curConnects);
-		recvBuf[10] = tmp_char;*/
-
 		if(send_to_everyone(connections, addressBuffer, addressBufferLen, recvBuf)) break;
 	}
-
-	closesocket(sock);
 }

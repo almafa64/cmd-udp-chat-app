@@ -35,6 +35,45 @@ void arg_processing(argLength length, argText arg, int index, char** argv)
 	}
 }
 
+ReciveNode* newReciveNode()
+{
+	ReciveNode* tmp = malloc(sizeof(*tmp));
+	if (tmp == NULL) return NULL;
+	ZeroMemory(tmp, sizeof(*tmp));
+	tmp->recived = malloc(MAX_PACKET * sizeof(tmp->recived[0]));
+	if (tmp->recived == NULL) return NULL;
+	ZeroMemory(tmp->recived, sizeof(MAX_PACKET * sizeof(tmp->recived[0])));
+	return tmp;
+}
+
+void deleteReciveNode(ReciveNode* node)
+{
+	free(node->recived);
+	free(node);
+}
+
+DWORD WINAPI reciveThread(LPVOID param)
+{
+	SOCKADDR_IN* ips = (isClient) ? NULL : ((ReciveThreadParam*)param)->recvAddr;
+	for (;;)
+	{
+		int iResult = my_wrecive(&sock, reciveLast->recived, (isClient) ? NULL : &ips[revcivedMsgCount]);
+		if (iResult == SOCKET_ERROR)
+		{
+			if (WSAGetLastError() == WSAETIMEDOUT) continue;
+			return 1;
+		}
+
+		reciveLast->recived[iResult] = L'\0';
+		revcivedMsgCount++;
+
+		reciveLast->next = newReciveNode();
+		reciveLast->next->prev = reciveLast;
+		reciveLast = reciveLast->next;
+	}
+	return 0;
+}
+
 int main(int argc, char* argv[])
 {
 	isClient = TRUE;
@@ -46,7 +85,7 @@ int main(int argc, char* argv[])
 	if (iResult != 0)
 	{
 		printf("WSAStartup failed: %i\n", iResult);
-		return 1;
+		goto end;
 	}
 
 	cmd = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -60,7 +99,7 @@ int main(int argc, char* argv[])
 	if (sock == INVALID_SOCKET)
 	{
 		handleWSAError(__LINE__);
-		return 1;
+		goto end;
 	}
 
 	BOOL bNewBehavior = FALSE;
@@ -72,8 +111,7 @@ int main(int argc, char* argv[])
 	if (iResult == SOCKET_ERROR)
 	{
 		handleWSAError(__LINE__);
-		closesocket(sock);
-		return 1;
+		goto end;
 	}
 
 	setlocale(LC_ALL, "");
@@ -81,10 +119,20 @@ int main(int argc, char* argv[])
 	int a = _setmode(_fileno(stdin), _O_U16TEXT);
 	EnableVTMode();
 
+	revcivedMsgCount = 0;
+	reciveFirst = reciveLast = newReciveNode();
+	if (reciveFirst == NULL)
+	{
+		printf("error while mallocing memory for reciveFirst\n");
+		goto end;
+	}
+
 	if (isClient) runClient();
 	else runServer();
 
+end:
+	closesocket(sock);
 	system("Pause");
 	WSACleanup();
-	return 0;
+	return 1;
 }

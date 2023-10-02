@@ -22,9 +22,10 @@
 #define IPLEN 15
 #define PORTLEN 5
 #define MAX_CONNECTIONS 20
-#define TIMEOUT 20
-#define MAX_PACKET 1024			// with default name (anom) you can write MAX_PACKET - 20 characters
+#define TIMEOUT 10
+#define MAX_PACKET 1024			// with default name (anom) you can write MAX_PACKET - 10 characters
 #define MAX_LINE_HISTORY 20
+#define MAX_MSG_MEMORY 20
 
 BOOL isClient;
 SOCKET sock;
@@ -35,5 +36,25 @@ HHOOK mouseHook;
 HANDLE cmd;
 HWND cmdWindow;
 SHORT cmdCols, cmdRows;
+
+typedef struct ReciveThreadParam
+{
+	SOCKADDR_IN* recvAddr;
+} ReciveThreadParam;
+
+typedef struct ReciveNode
+{
+	WCHAR* recived;
+	struct ReciveNode* next;
+	struct ReciveNode* prev;
+} ReciveNode;
+
+ReciveNode* newReciveNode();
+void deleteReciveNode(ReciveNode* node);
+
+//WCHAR revcivedMsgs[MAX_MSG_MEMORY][MAX_PACKET];
+int revcivedMsgCount;
+ReciveNode *reciveFirst, *reciveLast;
+DWORD WINAPI reciveThread(LPVOID param);
 
 #endif
