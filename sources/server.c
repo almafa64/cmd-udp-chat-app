@@ -90,9 +90,6 @@ void runServer()
 	printf("this is server\n");
 
 	SOCKADDR_IN recvAddr = { 0 };
-	SOCKADDR_IN senderAddr = { 0 };
-
-	WCHAR recvBuf[MAX_PACKET] = { 0 };
 	WCHAR addressBuffer[IPLEN + 1]; // 255.255.255.255\0
 	const int addressBufferLen = sizeof(addressBuffer) / sizeof(addressBuffer[0]);
 
@@ -123,14 +120,12 @@ void runServer()
 		return;
 	}
 
-	/*SOCKADDR_IN recvIps[sizeof(revcivedMsgs) / sizeof(revcivedMsgs[0])] = { 0 };
-	ReciveThreadParam param2 = { recvIps };
-	HANDLE recvThread = CreateThread(NULL, 0, reciveThread, &param2, 0, NULL);
+	HANDLE recvThread = CreateThread(NULL, 0, reciveThread, NULL, 0, NULL);
 	if (recvThread == NULL)
 	{
 		printf("error while making recive thread: %li\n", GetLastError());
 		return;
-	}*/
+	}
 
 	for (;;)
 	{
@@ -147,15 +142,12 @@ void runServer()
 			}
 		}
 
-#pragma region PUT_IN_ASYNC
-		iResult = my_wrecive(&sock, recvBuf, &senderAddr);
-		if (iResult == SOCKET_ERROR)
-		{
-			if (WSAGetLastError() == WSAETIMEDOUT) continue;
-			else break;
-		}
-		recvBuf[iResult] = L'\0';
-#pragma endregion
+		if (reciveFirst->ip.sin_port == 0) continue;
+
+		WCHAR* recvBuf = reciveFirst->recived;
+		iResult = wcslen(recvBuf);
+
+		SOCKADDR_IN senderAddr = reciveFirst->ip;
 
 		ip_to_wstring(addressBuffer, addressBufferLen, &senderAddr);
 		printf("message received \"%ls\" from %ls:%i\n", recvBuf, addressBuffer, senderAddr.sin_port);
@@ -171,8 +163,15 @@ void runServer()
 
 		connections[place].timeout = TIMEOUT;
 
-		if (iResult < 1) continue;
+		if (iResult == 0) continue;
 
-		if(send_to_everyone(connections, addressBuffer, addressBufferLen, recvBuf)) break;
+		if(recvBuf[0] != L'l' && send_to_everyone(connections, addressBuffer, addressBufferLen, recvBuf)) break;
+
+		if (reciveFirst->next != NULL)
+		{
+			reciveFirst = reciveFirst->next;
+			deleteReciveNode(&reciveFirst->prev);
+		}
+		else reciveFirst->ip.sin_port = 0;
 	}
 }

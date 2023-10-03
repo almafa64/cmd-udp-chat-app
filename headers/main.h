@@ -37,23 +37,17 @@ HANDLE cmd;
 HWND cmdWindow;
 SHORT cmdCols, cmdRows;
 
-typedef struct ReciveThreadParam
-{
-	SOCKADDR_IN* recvAddr;
-} ReciveThreadParam;
-
 typedef struct ReciveNode
 {
 	WCHAR* recived;
 	struct ReciveNode* next;
 	struct ReciveNode* prev;
+	SOCKADDR_IN ip;
 } ReciveNode;
 
 ReciveNode* newReciveNode();
-void deleteReciveNode(ReciveNode* node);
+void deleteReciveNode(ReciveNode** node);
 
-//WCHAR revcivedMsgs[MAX_MSG_MEMORY][MAX_PACKET];
-int revcivedMsgCount;
 ReciveNode *reciveFirst, *reciveLast;
 DWORD WINAPI reciveThread(LPVOID param);
 

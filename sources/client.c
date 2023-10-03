@@ -221,7 +221,7 @@ void runClient()
 		nameLen = 4;
 	}
 
-	int iResult = my_wsend(&sock, L"", &servaddr);
+	int iResult = my_wsend(&sock, L"l", &servaddr); // login on server
 	if (iResult == SOCKET_ERROR) return;
 
 	printf(CSI "?1049h"); // enable alt cmd
@@ -288,7 +288,6 @@ void runClient()
 		return;
 	}
 
-	int prevCount = 0;
 	HANDLE recvThread = CreateThread(NULL, 0, reciveThread, NULL, 0, NULL);
 	if (recvThread == NULL)
 	{
@@ -399,6 +398,8 @@ void runClient()
 
 	rec:
 
+		if (reciveFirst->ip.sin_port == 0) continue;
+
 		printf(CSI "?25l" ESC "7" CSI "%d;1H", (int)marginAbsBottom + 1);
 		COORD tmp_coord = { 0, marginAbsBottom - 1 };
 		// only loop from top to bottom when the 2. bottom line is empty (the last printable line)
@@ -412,8 +413,6 @@ void runClient()
 				break;
 			}
 		}
-
-		if (reciveFirst->recived[0] == L'\0') continue;
 
 		WCHAR* recvMsg = reciveFirst->recived;
 		iResult = wcslen(recvMsg);
@@ -432,11 +431,11 @@ void runClient()
 		if (MAX_LINE_HISTORY != 0)
 		{
 			int n = (iResult / 120) + 1;
-			yAbsPos += n;
+			if(yAbsPos <= marginHeight) yAbsPos += n;
 
 			if (yAbsPos > marginHeight)
 			{
-				while (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) != L' ') // scroll until empty space (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) == L' ')
+				while (ReadCharAtPos(cmd, (COORD) { 0, marginAbsBottom }) != L' ') // scroll until empty space
 				{
 					history_save_down(&scrolled, lines, lines_size, line_size);
 					ReadLine(cmd, &lines[line_size * (scrolled)], cmdCols, marginAbsTop);
@@ -453,12 +452,15 @@ void runClient()
 		}
 
 		printColoredText(recvMsg, iResult);
+
 	end:
 		if (reciveFirst->next != NULL)
 		{
 			reciveFirst = reciveFirst->next;
-			deleteReciveNode(reciveFirst->prev);
+			deleteReciveNode(&reciveFirst->prev);
 		}
-		else recvMsg[0] = L'\0';
+		else reciveFirst->ip.sin_port = 0;
+
+		printf(ESC "8" CSI "?25h");
 	}
 }

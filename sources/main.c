@@ -46,32 +46,37 @@ ReciveNode* newReciveNode()
 	return tmp;
 }
 
-void deleteReciveNode(ReciveNode* node)
+void deleteReciveNode(ReciveNode** node)
 {
-	free(node->recived);
-	free(node);
+	free((*node)->recived);
+	free(*node);
+	*node = NULL;
 }
 
 DWORD WINAPI reciveThread(LPVOID param)
 {
-	SOCKADDR_IN* ips = (isClient) ? NULL : ((ReciveThreadParam*)param)->recvAddr;
 	for (;;)
 	{
-		int iResult = my_wrecive(&sock, reciveLast->recived, (isClient) ? NULL : &ips[revcivedMsgCount]);
+		int iResult = my_wrecive(&sock, reciveLast->recived, (isClient) ? NULL : &reciveLast->ip);
 		if (iResult == SOCKET_ERROR)
 		{
 			if (WSAGetLastError() == WSAETIMEDOUT) continue;
-			return 1;
+			break;
+		}
+
+		if (isClient)
+		{
+			reciveLast->ip = (SOCKADDR_IN){ 0 };
+			reciveLast->ip.sin_port = 1;
 		}
 
 		reciveLast->recived[iResult] = L'\0';
-		revcivedMsgCount++;
 
 		reciveLast->next = newReciveNode();
 		reciveLast->next->prev = reciveLast;
 		reciveLast = reciveLast->next;
 	}
-	return 0;
+	return 1;
 }
 
 int main(int argc, char* argv[])
@@ -119,7 +124,6 @@ int main(int argc, char* argv[])
 	int a = _setmode(_fileno(stdin), _O_U16TEXT);
 	EnableVTMode();
 
-	revcivedMsgCount = 0;
 	reciveFirst = reciveLast = newReciveNode();
 	if (reciveFirst == NULL)
 	{

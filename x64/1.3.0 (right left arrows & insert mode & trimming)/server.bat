@@ -1,1 +1,1 @@
-@ECHO OFF & title server & a.exe -s
+@ECHO OFF & title server & network_main.exe -s

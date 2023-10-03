@@ -251,7 +251,7 @@ int my_wrecive(SOCKET* socket, WCHAR* buffer, SOCKADDR_IN* senderAddr)
 			closesocket(*socket);
 		}
 	}
-	else res >>= 1;
+	else res /= sizeof(buffer[0]);
 	return res;
 }
 
