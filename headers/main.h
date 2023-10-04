@@ -15,8 +15,10 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "Shlwapi.lib")
+#if defined(_MSC_VER)
+	#pragma comment(lib, "Ws2_32.lib")
+	#pragma comment(lib, "Shlwapi.lib")
+#endif
 
 #define SIO_UDP_CONNRESET _WSAIOW(IOC_VENDOR, 12) // fix for udp sending to disconnected client crash
 
