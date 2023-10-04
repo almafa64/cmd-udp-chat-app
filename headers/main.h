@@ -13,6 +13,7 @@
 #include <winsock2.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Shlwapi.lib")
@@ -22,10 +23,14 @@
 #define IPLEN 15
 #define PORTLEN 5
 #define MAX_CONNECTIONS 20
-#define TIMEOUT 10
+#define TIMEOUT 5
 #define MAX_PACKET 1024			// with default name (anom) you can write MAX_PACKET - 10 characters
 #define MAX_LINE_HISTORY 20
 #define MAX_MSG_MEMORY 20
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+static_assert(TIMEOUT >= 1, "TIMEOUT cannot be smaller than 1");
 
 BOOL isClient;
 SOCKET sock;

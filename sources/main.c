@@ -121,7 +121,7 @@ int main(int argc, char* argv[])
 
 	setlocale(LC_ALL, "");
 	//int a = _setmode(_fileno(stdout), _O_U16TEXT);
-	int a = _setmode(_fileno(stdin), _O_U16TEXT);
+	(void)_setmode(_fileno(stdin), _O_U16TEXT);
 	EnableVTMode();
 
 	reciveFirst = reciveLast = newReciveNode();
@@ -136,7 +136,8 @@ int main(int argc, char* argv[])
 
 end:
 	closesocket(sock);
-	system("Pause");
 	WSACleanup();
+	//CloseHandle(recvThread);
+	system("Pause");
 	return 1;
 }

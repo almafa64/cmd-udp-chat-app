@@ -169,12 +169,12 @@ TCHAR ReadCharAtPos(HANDLE hConsoleOutput, COORD pos)
 	return tmp;
 }
 
-BOOL ReadLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, DWORD charsToRead, SHORT startY)
+BOOL ReadLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, SHORT charsToRead, SHORT startY)
 {
 	SMALL_RECT t = { 0, startY, charsToRead - 1, startY };
 	return ReadConsoleOutput(hConsoleOutput, buffer, (COORD) { charsToRead, 1 }, (COORD) { 0, 0 }, & t);
 }
-BOOL WriteLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, DWORD charsToWrite, SHORT startY)
+BOOL WriteLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, SHORT charsToWrite, SHORT startY)
 {
 	SMALL_RECT t = { 0, startY, charsToWrite - 1, startY };
 	return WriteConsoleOutput(hConsoleOutput, buffer, (COORD) { charsToWrite, 1 }, (COORD) { 0, 0 }, & t);
@@ -257,7 +257,7 @@ int my_wrecive(SOCKET* socket, WCHAR* buffer, SOCKADDR_IN* senderAddr)
 
 int my_wsend(SOCKET* socket, WCHAR* msg, SOCKADDR_IN* serverAddr)
 {
-	int res = sendto(*socket, (char*)msg, wcslen(msg) * sizeof(*msg), 0, (SOCKADDR*)serverAddr, sizeof(*serverAddr));
+	int res = sendto(*socket, (char*)msg, (int)wcslen(msg) * sizeof(*msg), 0, (SOCKADDR*)serverAddr, sizeof(*serverAddr));
 	if (res == SOCKET_ERROR)
 	{
 		handleWSAError(__LINE__);
@@ -272,11 +272,13 @@ BOOL set_addr(SOCKADDR_IN* addr)
 
 	printf("address (x.y.z.w -> x.y.z.w:8080, :x -> 127.0.0.1:x, nothing -> 127.0.0.1:8080)\n(e.g.: 192.168.1.51:27015): ");
 	fgetws(ip_port, sizeof(ip_port) / sizeof(ip_port[0]), stdin);
-	int ip_portSize = wcslen(ip_port);
+	size_t ip_portSize = wcslen(ip_port);
 	if (ip_port[ip_portSize - 1] == L'\n') ip_port[--ip_portSize] = L'\0';
 
-	WCHAR _ip[IPLEN + 1] = L"127.0.0.1";
-	WCHAR _port[PORTLEN + 1] = L"8080";
+	WCHAR _ip[IPLEN + 1];
+	WCHAR _port[PORTLEN + 1];
+	wcscpy_s(_ip, sizeof(_ip) / sizeof(_ip[0]), L"127.0.0.1");
+	wcscpy_s(_port, sizeof(_port) / sizeof(_port[0]), L"8080");
 	int ipLen = 10, portLen = 5, i = 0;
 
 	BOOL writeIp = TRUE;
@@ -288,7 +290,7 @@ BOOL set_addr(SOCKADDR_IN* addr)
 			int dots = 0;
 			for (int tags = 0; i < ip_portSize; ++i)
 			{
-				char cur = ip_port[i];
+				WCHAR cur = ip_port[i];
 				if (cur == L'.')
 				{
 					dots++;
@@ -324,7 +326,7 @@ BOOL set_addr(SOCKADDR_IN* addr)
 
 			for (i = 0, ipLen = 0; i <= ip_portSize; ++i)
 			{
-				char cur = ip_port[i];
+				WCHAR cur = ip_port[i];
 				if (cur == L':')
 				{
 					_ip[ipLen++] = L'\0';
@@ -475,7 +477,7 @@ for e in a.split("\n"):
 		if (!CreateProcessA(exe, arg, NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
 		{
 			printf(CSI"2K" CSI "%i;0H" "Failed to create new cmd window %li", GetConsoleCursorPosition(cmd).Y + 1, GetLastError());
-			char a = _getch();
+			(void)_getch();
 			return;
 		}
 
@@ -485,6 +487,6 @@ for e in a.split("\n"):
 	else
 	{
 		printf(CSI"2K" CSI "%i;0H" "\"%S\" command is invalid", GetConsoleCursorPosition(cmd).Y + 1, command);
-		char a = _getch();
+		(void)_getch();
 	}
 }

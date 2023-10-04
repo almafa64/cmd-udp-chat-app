@@ -145,12 +145,12 @@ void runServer()
 		if (reciveFirst->ip.sin_port == 0) continue;
 
 		WCHAR* recvBuf = reciveFirst->recived;
-		iResult = wcslen(recvBuf);
+		iResult = (int)wcslen(recvBuf);
 
 		SOCKADDR_IN senderAddr = reciveFirst->ip;
 
 		ip_to_wstring(addressBuffer, addressBufferLen, &senderAddr);
-		printf("message received \"%ls\" from %ls:%i\n", recvBuf, addressBuffer, senderAddr.sin_port);
+		printf("message received \"%ls\" from %ls:%i\n", (iResult == 1) ? L"keep_alive" : recvBuf, addressBuffer, senderAddr.sin_port);
 
 		int place = find_addr_in_users(&senderAddr, connections);
 		if (place == -1)
@@ -165,7 +165,7 @@ void runServer()
 
 		if (iResult == 0) continue;
 
-		if(recvBuf[0] != L'l' && send_to_everyone(connections, addressBuffer, addressBufferLen, recvBuf)) break;
+		if (iResult != 1 && send_to_everyone(connections, addressBuffer, addressBufferLen, recvBuf)) break;
 
 		if (reciveFirst->next != NULL)
 		{

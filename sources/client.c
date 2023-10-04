@@ -21,7 +21,8 @@ DWORD WINAPI messageThread(LPVOID lpParam)
 {
 	mouseHook = SetWindowsHookExW(WH_MOUSE_LL, MouseHookProc, NULL, 0);
 	if (mouseHook == NULL) return 1;
-	GetMessageW(NULL, NULL, 0, 0);
+	MSG m;
+	GetMessageW(&m, cmdWindow, 0, 0);
 	return 0;
 }
 
@@ -31,9 +32,11 @@ BOOL CALLBACK ctrl_handler(DWORD dwCtrlType)
 	if (mouseHook)
 	{
 		UnhookWindowsHookEx(mouseHook);
-		ExitProcess(0);
 		mouseHook = NULL;
 	}
+	closesocket(sock);
+	WSACleanup();
+	ExitProcess(0);
 	return TRUE;
 }
 
@@ -210,11 +213,11 @@ void runClient()
 	fflush(stdin);
 	fflush(stdout);
 	fgetws(name, 31, stdin);
-	nameLen = wcslen(name);
+	nameLen = (int)wcslen(name);
 	if (name[nameLen - 1] == L'\n') --nameLen;
 	name[nameLen] = L'\0';
 	StrTrimW(name, L" ");
-	nameLen = wcslen(name);
+	nameLen = (int)wcslen(name);
 	if (nameLen == 0)
 	{
 		wcscpy_s(name, nameWordSize, L"anom");
@@ -266,7 +269,7 @@ void runClient()
 		lines[i].Attributes = FOREGROUND_BRIGHT_WHITE;
 	}
 
-	int maxMsg = 4 * cmdCols - sizeof("message: ");
+	int maxMsg = (unsigned long long)(4 * cmdCols) - sizeof("message: ");
 
 	WCHAR sendMsg[MAX_PACKET] = { 0 };
 
@@ -296,6 +299,8 @@ void runClient()
 	}
 
 	printf(CSI "%d;1H" "message: " CSI "%i q" CSI "?25h", cmdRows - 3, (insert) ? 1 : 3);
+
+	ULONGLONG tick = 0;
 
 	for (;;)
 	{
@@ -395,8 +400,15 @@ void runClient()
 				}
 			}
 		}
+	rec:;
 
-	rec:
+		ULONGLONG cur_time = GetTickCount64();
+		if (cur_time > tick)
+		{
+			tick = cur_time + MAX(TIMEOUT * 1000 - 2000, 500); // put timeout on timer
+			iResult = my_wsend(&sock, L"l", &servaddr); // keep alive
+			if (iResult == SOCKET_ERROR) break;
+		}
 
 		if (reciveFirst->ip.sin_port == 0) continue;
 
@@ -415,7 +427,7 @@ void runClient()
 		}
 
 		WCHAR* recvMsg = reciveFirst->recived;
-		iResult = wcslen(recvMsg);
+		iResult = (int)wcslen(recvMsg);
 
 		if (iResult == 10 && is_wnumber(recvMsg, iResult))
 		{

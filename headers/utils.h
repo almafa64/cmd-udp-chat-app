@@ -14,7 +14,7 @@
 #define LESC L"\x1b"
 #define LCSI L"\x1b["
 
-int ctoh(char ch);
+int ctoh(TCHAR ch);
 int int_length(int num);
 BOOL is_wnumber(WCHAR* text, int len);
 void handleWSAError(size_t line);
@@ -23,8 +23,8 @@ BOOL GetConsoleSize(HANDLE hConsoleOutput, SHORT* cols, SHORT* rows, SHORT* top)
 BOOL SetConsoleSize(HANDLE hConsoleOutput, SHORT cols, SHORT rows);
 BOOL ScrollConsoleDown(HANDLE hConsoleOutput, SHORT iRows);
 TCHAR ReadCharAtPos(HANDLE hConsoleOutput, COORD pos);
-BOOL ReadLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, DWORD charsToRead, SHORT startY);
-BOOL WriteLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, DWORD charsToWrite, SHORT startY);
+BOOL ReadLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, SHORT charsToRead, SHORT startY);
+BOOL WriteLine(HANDLE hConsoleOutput, CHAR_INFO* buffer, SHORT charsToWrite, SHORT startY);
 BOOL EnableVTMode();
 void PrintVerticalBorder(int pos);
 void PrintHorizontalBorder(SHORT cols, BOOL fIsTop);
